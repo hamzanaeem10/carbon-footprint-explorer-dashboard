@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Scatter, Filter, Download } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, Filter, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BarChartVisualization from '@/components/BarChartVisualization';
 import LineChartVisualization from '@/components/LineChartVisualization';
@@ -142,7 +142,7 @@ const Index = () => {
               <span className="hidden sm:inline">Trends</span>
             </TabsTrigger>
             <TabsTrigger value="scatter" className="flex items-center space-x-2">
-              <Scatter className="w-4 h-4" />
+              <Activity className="w-4 h-4" />
               <span className="hidden sm:inline">Scatter</span>
             </TabsTrigger>
           </TabsList>

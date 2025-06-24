@@ -8,21 +8,44 @@ import { Button } from '@/components/ui/button';
 import BarChartVisualization from '@/components/BarChartVisualization';
 import LineChartVisualization from '@/components/LineChartVisualization';
 import ScatterPlotVisualization from '@/components/ScatterPlotVisualization';
-import { generateSampleData, EmissionData } from '@/utils/dataGenerator';
+import { fetchRealCO2Data, EmissionData } from '@/utils/dataGenerator';
 
 const Index = () => {
   const [data, setData] = useState<EmissionData[]>([]);
   const [selectedYear, setSelectedYear] = useState<number>(2020);
   const [selectedCountries, setSelectedCountries] = useState<string[]>(['United States', 'China', 'India', 'Russia']);
   const [isLoading, setIsLoading] = useState(true);
+  const [dataSource, setDataSource] = useState<string>('');
 
   useEffect(() => {
-    // Simulate data loading
-    setTimeout(() => {
-      const sampleData = generateSampleData();
-      setData(sampleData);
-      setIsLoading(false);
-    }, 1000);
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        console.log('Loading CO₂ emissions data...');
+        const co2Data = await fetchRealCO2Data();
+        setData(co2Data);
+        setDataSource('Our World in Data');
+        
+        // Update selected countries based on actual data
+        const availableCountries = [...new Set(co2Data.map(d => d.country))];
+        const topCountries = co2Data
+          .filter(d => d.year === 2020)
+          .sort((a, b) => b.co2_emissions - a.co2_emissions)
+          .slice(0, 4)
+          .map(d => d.country);
+        
+        setSelectedCountries(topCountries.length > 0 ? topCountries : availableCountries.slice(0, 4));
+        
+        console.log(`Loaded ${co2Data.length} data points from ${dataSource}`);
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setDataSource('Sample Data (Fallback)');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   const years = Array.from(new Set(data.map(d => d.year))).sort((a, b) => b - a);
@@ -34,9 +57,9 @@ const Index = () => {
     );
     
     const csvContent = [
-      'Country,Year,CO2_Emissions,Population,GDP_Per_Capita',
+      'Country,Year,CO2_Emissions,Population,GDP_Per_Capita,CO2_Per_Capita',
       ...filteredData.map(d => 
-        `${d.country},${d.year},${d.co2_emissions},${d.population},${d.gdp_per_capita}`
+        `${d.country},${d.year},${d.co2_emissions},${d.population},${d.gdp_per_capita},${d.co2_per_capita}`
       )
     ].join('\n');
     
@@ -54,7 +77,8 @@ const Index = () => {
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading CO₂ emissions data...</p>
+          <p className="text-lg text-gray-600">Loading real CO₂ emissions data from Our World in Data...</p>
+          <p className="text-sm text-gray-500 mt-2">This may take a moment...</p>
         </div>
       </div>
     );
@@ -72,7 +96,7 @@ const Index = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Carbon Footprint Explorer</h1>
-                <p className="text-sm text-gray-600">Global CO₂ Emissions Dashboard (1990-2022)</p>
+                <p className="text-sm text-gray-600">Real Global CO₂ Emissions Data • Source: {dataSource}</p>
               </div>
             </div>
             <div className="flex items-center space-x-3">
@@ -152,7 +176,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle>Top CO₂ Emitting Countries in {selectedYear}</CardTitle>
                 <p className="text-sm text-gray-600">
-                  Annual CO₂ emissions measured in million tonnes. Hover for detailed information.
+                  Annual CO₂ emissions from fossil fuels and industry (million tonnes). Data from Our World in Data.
                 </p>
               </CardHeader>
               <CardContent>
@@ -166,7 +190,7 @@ const Index = () => {
               <CardHeader>
                 <CardTitle>CO₂ Emission Trends Over Time</CardTitle>
                 <p className="text-sm text-gray-600">
-                  Historical trends for selected countries. Use mouse wheel to zoom, drag to pan.
+                  Historical CO₂ emissions trends for selected countries. Use mouse wheel to zoom, drag to pan.
                 </p>
               </CardHeader>
               <CardContent>
@@ -192,7 +216,17 @@ const Index = () => {
 
         {/* Footer */}
         <div className="mt-12 text-center text-sm text-gray-500">
-          <p>Data visualization powered by D3.js • Sample dataset for demonstration purposes</p>
+          <p>Data visualization powered by D3.js • Real CO₂ data from Our World in Data GitHub repository</p>
+          <p className="mt-1">
+            <a 
+              href="https://github.com/owid/co2-data" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-emerald-600 hover:text-emerald-800 underline"
+            >
+              View Dataset Source
+            </a>
+          </p>
         </div>
       </div>
     </div>

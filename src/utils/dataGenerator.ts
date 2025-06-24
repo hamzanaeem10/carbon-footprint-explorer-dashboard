@@ -1,91 +1,156 @@
-
 export interface EmissionData {
   country: string;
   year: number;
-  co2_emissions: number; // Million tonnes
-  population: number;    // Millions
-  gdp_per_capita: number; // USD
+  co2_emissions: number; // co2 field from dataset
+  population: number;
+  gdp_per_capita: number; // calculated from gdp/population
+  co2_per_capita: number; // co2_per_capita field from dataset
 }
 
-const countries = [
-  'China', 'United States', 'India', 'Russia', 'Japan', 'Germany', 'Iran', 'South Korea',
-  'Saudi Arabia', 'Indonesia', 'Canada', 'Mexico', 'Brazil', 'South Africa', 'Turkey',
-  'Australia', 'United Kingdom', 'Poland', 'Italy', 'France', 'Ukraine', 'Spain',
-  'Thailand', 'Egypt', 'Malaysia', 'Argentina', 'Netherlands', 'Kazakhstan', 'Pakistan',
-  'Vietnam'
-];
+// Cache for the dataset
+let cachedData: EmissionData[] | null = null;
 
-// Base data for realistic scaling - approximate 2020 values
-const baseCountryData: Record<string, { co2: number; pop: number; gdp: number }> = {
-  'China': { co2: 10175, pop: 1439, gdp: 10500 },
-  'United States': { co2: 4713, pop: 331, gdp: 63500 },
-  'India': { co2: 2442, pop: 1380, gdp: 1900 },
-  'Russia': { co2: 1577, pop: 146, gdp: 11600 },
-  'Japan': { co2: 1061, pop: 126, gdp: 40100 },
-  'Germany': { co2: 644, pop: 83, gdp: 46500 },
-  'Iran': { co2: 633, pop: 84, gdp: 2900 },
-  'South Korea': { co2: 571, pop: 52, gdp: 31800 },
-  'Saudi Arabia': { co2: 517, pop: 35, gdp: 23000 },
-  'Indonesia': { co2: 486, pop: 274, gdp: 3900 },
-  'Canada': { co2: 481, pop: 38, gdp: 46300 },
-  'Mexico': { co2: 441, pop: 129, gdp: 9700 },
-  'Brazil': { co2: 419, pop: 213, gdp: 7500 },
-  'South Africa': { co2: 390, pop: 60, gdp: 6000 },
-  'Turkey': { co2: 353, pop: 85, gdp: 9100 },
-  'Australia': { co2: 348, pop: 26, gdp: 55100 },
-  'United Kingdom': { co2: 326, pop: 67, gdp: 42300 },
-  'Poland': { co2: 282, pop: 38, gdp: 15200 },
-  'Italy': { co2: 254, pop: 60, gdp: 31300 },
-  'France': { co2: 249, pop: 68, gdp: 39000 },
-  'Ukraine': { co2: 185, pop: 44, gdp: 3700 },
-  'Spain': { co2: 184, pop: 47, gdp: 27000 },
-  'Thailand': { co2: 183, pop: 70, gdp: 7200 },
-  'Egypt': { co2: 181, pop: 103, gdp: 3000 },
-  'Malaysia': { co2: 178, pop: 33, gdp: 11200 },
-  'Argentina': { co2: 153, pop: 45, gdp: 8900 },
-  'Netherlands': { co2: 153, pop: 17, gdp: 52300 },
-  'Kazakhstan': { co2: 142, pop: 19, gdp: 9100 },
-  'Pakistan': { co2: 138, pop: 225, gdp: 1300 },
-  'Vietnam': { co2: 136, pop: 98, gdp: 2800 }
+export const fetchRealCO2Data = async (): Promise<EmissionData[]> => {
+  if (cachedData) {
+    return cachedData;
+  }
+
+  try {
+    console.log('Fetching CO₂ data from Our World in Data...');
+    
+    // Fetch the CSV data from GitHub
+    const response = await fetch('https://raw.githubusercontent.com/owid/co2-data/master/owid-co2-data.csv');
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const csvText = await response.text();
+    console.log('CSV data fetched successfully');
+    
+    // Parse CSV data
+    const rows = csvText.split('\n');
+    const headers = rows[0].split(',').map(h => h.trim());
+    
+    console.log('CSV headers:', headers.slice(0, 10)); // Log first 10 headers
+    
+    const data: EmissionData[] = [];
+    
+    // Process each row (skip header)
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row.trim()) continue; // Skip empty rows
+      
+      // Parse CSV row (handle commas in quoted fields)
+      const values = parseCSVRow(row);
+      
+      if (values.length < headers.length) continue; // Skip malformed rows
+      
+      const rowData: { [key: string]: string } = {};
+      headers.forEach((header, index) => {
+        rowData[header] = values[index] || '';
+      });
+      
+      // Extract required fields
+      const country = rowData['country']?.trim();
+      const year = parseInt(rowData['year']);
+      const co2 = parseFloat(rowData['co2']);
+      const population = parseFloat(rowData['population']);
+      const gdp = parseFloat(rowData['gdp']);
+      const co2_per_capita = parseFloat(rowData['co2_per_capita']);
+      
+      // Filter valid data points
+      if (
+        country && 
+        !isNaN(year) && 
+        !isNaN(co2) && 
+        !isNaN(population) && 
+        !isNaN(gdp) &&
+        co2 > 0 && 
+        population > 0 && 
+        gdp > 0 &&
+        year >= 1990 && 
+        year <= 2022 &&
+        country !== 'World' && // Exclude world totals
+        !country.includes('income') // Exclude income group aggregates
+      ) {
+        data.push({
+          country,
+          year,
+          co2_emissions: co2,
+          population: population / 1000000, // Convert to millions
+          gdp_per_capita: gdp / population,
+          co2_per_capita: co2_per_capita || 0
+        });
+      }
+    }
+    
+    console.log(`Processed ${data.length} valid data points`);
+    console.log('Sample countries:', [...new Set(data.map(d => d.country))].slice(0, 10));
+    
+    cachedData = data;
+    return data;
+    
+  } catch (error) {
+    console.error('Error fetching real CO₂ data:', error);
+    console.log('Falling back to generated sample data...');
+    
+    // Fallback to generated data if fetch fails
+    return generateSampleData();
+  }
 };
 
-export const generateSampleData = (): EmissionData[] => {
-  const data: EmissionData[] = [];
-  const years = Array.from({ length: 33 }, (_, i) => 1990 + i); // 1990-2022
-
-  countries.forEach(country => {
-    const baseData = baseCountryData[country] || { co2: 100, pop: 50, gdp: 5000 };
+// Helper function to parse CSV rows (handles quoted fields)
+function parseCSVRow(row: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < row.length; i++) {
+    const char = row[i];
     
-    years.forEach((year, yearIndex) => {
-      // Create realistic trends over time
-      const timeProgress = yearIndex / (years.length - 1);
-      
-      // CO2 emissions: generally increasing with some variation
-      const co2Growth = country === 'China' ? 
-        Math.pow(timeProgress, 0.8) * 2.5 + 0.3 : // China's rapid growth
-        country === 'United States' ? 
-        0.8 + timeProgress * 0.4 + Math.sin(timeProgress * Math.PI) * 0.1 : // US more stable
-        0.6 + timeProgress * 0.8 + Math.random() * 0.3; // Others varied growth
-      
-      const co2_emissions = Math.round(baseData.co2 * co2Growth * (0.8 + Math.random() * 0.4));
-      
-      // Population: steady growth
-      const popGrowth = 0.7 + timeProgress * 0.4 + Math.random() * 0.1;
-      const population = Math.round(baseData.pop * popGrowth);
-      
-      // GDP per capita: generally increasing
-      const gdpGrowth = 0.5 + timeProgress * 0.8 + Math.random() * 0.2;
-      const gdp_per_capita = Math.round(baseData.gdp * gdpGrowth);
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  
+  result.push(current.trim());
+  return result;
+}
+
+// Keep the original sample data generator as fallback
+export const generateSampleData = (): EmissionData[] => {
+  const countries = [
+    'China', 'United States', 'India', 'Russia', 'Japan', 'Germany', 'Iran', 
+    'South Korea', 'Saudi Arabia', 'Indonesia', 'Canada', 'Mexico', 'Brazil',
+    'South Africa', 'Turkey', 'Australia', 'United Kingdom', 'Poland', 'Italy',
+    'France', 'Ukraine', 'Thailand', 'Egypt', 'Pakistan', 'Argentina'
+  ];
+  
+  const data: EmissionData[] = [];
+  
+  for (const country of countries) {
+    for (let year = 1990; year <= 2022; year++) {
+      // Generate realistic base values
+      const baseEmissions = Math.random() * 10000 + 500;
+      const growthRate = (Math.random() - 0.5) * 0.05;
+      const yearFactor = Math.pow(1 + growthRate, year - 2000);
       
       data.push({
         country,
         year,
-        co2_emissions: Math.max(1, co2_emissions),
-        population: Math.max(1, population),
-        gdp_per_capita: Math.max(500, gdp_per_capita)
+        co2_emissions: Math.max(50, baseEmissions * yearFactor + (Math.random() - 0.5) * 500),
+        population: Math.random() * 1000 + 10,
+        gdp_per_capita: Math.random() * 50000 + 5000,
+        co2_per_capita: Math.random() * 20 + 1
       });
-    });
-  });
-
+    }
+  }
+  
   return data;
 };

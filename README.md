@@ -4,15 +4,6 @@
 
 **URL**: https://lovable.dev/projects/1ea8f0c2-a350-4875-81ca-d8e8b48ad8c3
 
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/1ea8f0c2-a350-4875-81ca-d8e8b48ad8c3) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
 
 **Use your preferred IDE**
 

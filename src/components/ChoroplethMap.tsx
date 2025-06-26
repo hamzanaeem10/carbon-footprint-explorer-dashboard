@@ -25,16 +25,46 @@ const ChoroplethMap: React.FC<ChoroplethMapProps> = ({ data, selectedYear }) => 
 
     // Filter data for selected year
     const yearData = data.filter(d => d.year === selectedYear);
+    console.log(`Choropleth: Found ${yearData.length} countries for year ${selectedYear}`);
     
-    // Create a map of country to CO2 emissions
+    // Create a map of country to CO2 emissions with better name matching
     const emissionsByCountry = new Map();
     yearData.forEach(d => {
+      // Store both original name and common variations
       emissionsByCountry.set(d.country, d.co2_emissions);
+      
+      // Add common name variations for better matching
+      const countryMappings: { [key: string]: string } = {
+        'United States': 'United States of America',
+        'Russia': 'Russian Federation',
+        'Iran': 'Iran (Islamic Republic of)',
+        'South Korea': 'Republic of Korea',
+        'North Korea': 'Democratic People\'s Republic of Korea',
+        'Venezuela': 'Venezuela (Bolivarian Republic of)',
+        'Bolivia': 'Bolivia (Plurinational State of)',
+        'Tanzania': 'United Republic of Tanzania',
+        'Democratic Republic of Congo': 'Democratic Republic of the Congo',
+        'Republic of Congo': 'Congo',
+        'Czech Republic': 'Czechia',
+        'Macedonia': 'North Macedonia'
+      };
+      
+      if (countryMappings[d.country]) {
+        emissionsByCountry.set(countryMappings[d.country], d.co2_emissions);
+      }
     });
 
-    // Color scale
-    const maxEmission = d3.max(yearData, d => d.co2_emissions) || 0;
-    const colorScale = d3.scaleSequential(d3.interpolateReds)
+    console.log('Sample emissions data:', Array.from(emissionsByCountry.entries()).slice(0, 5));
+
+    // Color scale with better range
+    const emissions = Array.from(emissionsByCountry.values());
+    const maxEmission = d3.max(emissions) || 0;
+    const minEmission = d3.min(emissions) || 0;
+    
+    console.log(`Emission range: ${minEmission} to ${maxEmission}`);
+    
+    const colorScale = d3.scaleSequential()
+      .interpolator(d3.interpolateReds)
       .domain([0, maxEmission]);
 
     // Tooltip
@@ -47,19 +77,25 @@ const ChoroplethMap: React.FC<ChoroplethMapProps> = ({ data, selectedYear }) => 
       .style("padding", "8px")
       .style("border-radius", "4px")
       .style("font-size", "12px")
-      .style("pointer-events", "none");
+      .style("pointer-events", "none")
+      .style("z-index", "1000");
 
-    // Load world map data (using a simple world map)
+    // Load world map data
     const fetchWorldData = async () => {
       try {
         const response = await fetch('https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson');
         const worldData = await response.json();
+
+        console.log(`Loaded ${worldData.features.length} countries from GeoJSON`);
+        console.log('Sample country names from GeoJSON:', worldData.features.slice(0, 5).map((d: any) => d.properties.name || d.properties.NAME));
 
         const projection = d3.geoNaturalEarth1()
           .scale(130)
           .translate([width / 2, height / 2]);
 
         const path = d3.geoPath().projection(projection);
+
+        let matchedCount = 0;
 
         // Draw countries
         svg.selectAll("path")
@@ -68,15 +104,22 @@ const ChoroplethMap: React.FC<ChoroplethMapProps> = ({ data, selectedYear }) => 
           .append("path")
           .attr("d", path)
           .attr("fill", (d: any) => {
-            const countryName = d.properties.NAME;
+            const countryName = d.properties.name || d.properties.NAME;
             const emission = emissionsByCountry.get(countryName);
-            return emission ? colorScale(emission) : "#f0f0f0";
+            
+            if (emission) {
+              matchedCount++;
+              return colorScale(emission);
+            }
+            return "#f0f0f0";
           })
           .attr("stroke", "#333")
           .attr("stroke-width", 0.5)
           .on("mouseover", function(event: any, d: any) {
-            const countryName = d.properties.NAME;
+            const countryName = d.properties.name || d.properties.NAME;
             const emission = emissionsByCountry.get(countryName);
+            
+            d3.select(this).attr("stroke-width", 1.5);
             
             tooltip.transition()
               .duration(200)
@@ -90,10 +133,13 @@ const ChoroplethMap: React.FC<ChoroplethMapProps> = ({ data, selectedYear }) => 
               .style("top", (event.pageY - 28) + "px");
           })
           .on("mouseout", function() {
+            d3.select(this).attr("stroke-width", 0.5);
             tooltip.transition()
               .duration(500)
               .style("opacity", 0);
           });
+
+        console.log(`Matched ${matchedCount} countries with emissions data`);
 
         // Add legend
         const legendWidth = 300;

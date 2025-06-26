@@ -3,11 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Activity, Filter, Download } from 'lucide-react';
+import { BarChart3, TrendingUp, Activity, Filter, Download, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BarChartVisualization from '@/components/BarChartVisualization';
 import LineChartVisualization from '@/components/LineChartVisualization';
 import ScatterPlotVisualization from '@/components/ScatterPlotVisualization';
+import ChoroplethMap from '@/components/ChoroplethMap';
 import { fetchRealCO2Data, EmissionData } from '@/utils/dataGenerator';
 
 const Index = () => {
@@ -125,7 +126,7 @@ const Index = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Year for Bar Chart
+                  Select Year for Analysis
                 </label>
                 <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
                   <SelectTrigger>
@@ -156,7 +157,7 @@ const Index = () => {
 
         {/* Visualizations */}
         <Tabs defaultValue="bar" className="space-y-6">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 bg-white/90 backdrop-blur-sm">
+          <TabsList className="grid w-full max-w-lg mx-auto grid-cols-4 bg-white/90 backdrop-blur-sm">
             <TabsTrigger value="bar" className="flex items-center space-x-2">
               <BarChart3 className="w-4 h-4" />
               <span className="hidden sm:inline">Bar Chart</span>
@@ -168,6 +169,10 @@ const Index = () => {
             <TabsTrigger value="scatter" className="flex items-center space-x-2">
               <Activity className="w-4 h-4" />
               <span className="hidden sm:inline">Scatter</span>
+            </TabsTrigger>
+            <TabsTrigger value="map" className="flex items-center space-x-2">
+              <MapPin className="w-4 h-4" />
+              <span className="hidden sm:inline">Map</span>
             </TabsTrigger>
           </TabsList>
 
@@ -209,6 +214,22 @@ const Index = () => {
               </CardHeader>
               <CardContent>
                 <ScatterPlotVisualization data={data} selectedYear={selectedYear} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="map">
+            <Card className="bg-white/90 backdrop-blur-sm border-emerald-100">
+              <CardHeader>
+                <CardTitle>Global CO₂ Emissions Choropleth Map ({selectedYear})</CardTitle>
+                <p className="text-sm text-gray-600">
+                  Countries are color-coded by their CO₂ emission levels. Hover over countries for detailed information.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-96">
+                  <ChoroplethMap data={data} selectedYear={selectedYear} />
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
